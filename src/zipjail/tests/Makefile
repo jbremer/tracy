@@ -5,7 +5,7 @@ CFLAGS += -D_POSIX_SOURCE
 CFLAGS += -D_GNU_SOURCE
 CFLAGS += -ggdb -pthread
 
-SOURCE=$(wildcard *.c)
+SOURCE=$(wildcard good/*.c bad/*.c)
 BINARY32=$(SOURCE:%.c=%-x86.out)
 BINARY64=$(SOURCE:%.c=%-x64.out)
 RESULTS=$(BINARY32:%.out=%.result)
@@ -20,7 +20,15 @@ default: $(BINARY32) $(BINARY64) $(RESULTS) unpack
 %-x64.out: %.c
 	$(CC) $^ $(CFLAGS) $(LDFLAGS) -o $@
 
-%.result: %.out
+good/%.result: good/%.out
+	touch /tmp/zipjail-input
+	rm -rf $(WORKDIR) /tmp/zipjail-dirtydir
+	mkdir -p $(WORKDIR)
+	echo hello > $(WORKDIR)/a.c
+	echo world > $(WORKDIR)/a.py
+	../zipjail /tmp/zipjail-input /tmp/zipjail-dirtydir ./$^
+
+bad/%.result: bad/%.out
 	touch /tmp/zipjail-input
 	rm -rf $(WORKDIR) /tmp/zipjail-dirtydir
 	mkdir -p $(WORKDIR)

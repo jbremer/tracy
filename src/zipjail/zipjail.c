@@ -71,7 +71,8 @@ static const char *read_path(
 
 static int check_path(const char *filepath)
 {
-    if(strstr(filepath, "..") != NULL) {
+    const char *ptr = strstr(filepath, "..");
+    if(ptr != NULL && (ptr[2] == '/' || ptr[2] == '\\')) {
         fprintf(stderr,
             "Detected potential directory traversal arbitrary overwrite!\n"
             "filepath=%s\n", filepath
