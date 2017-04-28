@@ -406,8 +406,8 @@ int main(int argc, char *argv[])
 {
     if(argc < 4) {
         fprintf(stderr,
-            "zipjail 0.3.1 - safe unpacking of potentially unsafe archives.\n"
-            "Copyright (C) 2016, Jurriaan Bremer <jbr@cuckoo.sh>.\n"
+            "zipjail 0.3.2 - safe unpacking of potentially unsafe archives.\n"
+            "Copyright (C) 2016-2017, Jurriaan Bremer <jbr@cuckoo.sh>.\n"
             "Based on Tracy by Merlijn Wajer and Bas Weelinck.\n"
             "    (https://github.com/MerlijnWajer/tracy)\n"
             "\n"
