@@ -21,12 +21,12 @@ directory to which file writes should be restricted.
 .. code-block:: bash
 
     $ zipjail
-    zipjail 0.3.2 - safe unpacking of potentially unsafe archives.
+    zipjail 0.3.3 - safe unpacking of potentially unsafe archives.
     Copyright (C) 2016-2017, Jurriaan Bremer <jbr@cuckoo.sh>.
     Based on Tracy by Merlijn Wajer and Bas Weelinck.
         (https://github.com/MerlijnWajer/tracy)
 
-    Usage: zipjail <input> <output> [-v] <command...>
+    Usage: zipjail <input> <output> [-v] [-c=/--clone=N] <command...>
       input:   input archive file
       output:  directory to extract files to
       verbose: some verbosity
@@ -75,6 +75,17 @@ additional whitespaces).
 .. code-block:: bash
 
     $ zipjail file.7z /tmp/unpacked 7z x -mmt=off -o/tmp/unpacked file.7z
+
+In some cases, however, such as when decrypting a password-protected ``.7z``
+file, it appears that up to two additional threads are used, so in order to
+do so one will have to bump the allowed ``clone(2)`` calls to two.
+Note: in terms of security this option weakens our protection a bit due as it
+allows multiple threads that may be used for race conditions.
+
+.. code-block:: bash
+
+    $ zipjail pw.7z /tmp/unpacked --clone=2 7z x -mmt=off \
+        -Pinfected -o/tmp/unpacked pw.7z
 
 unace
 ^^^^^

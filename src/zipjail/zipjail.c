@@ -17,6 +17,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
@@ -38,6 +39,7 @@ static const char *g_filepath;
 static const char *g_dirpath;
 static int g_dirpath_length;
 static int g_verbose;
+static int g_max_clones;
 
 static const char *g_syscall_allowed[] = {
     "read", "write", "lseek", "stat", "fstat", "close", "umask", "lstat",
@@ -281,11 +283,25 @@ static int _sandbox_futex(struct tracy_event *e)
 {
     dprintf("futex(%ld, %ld, 0x%lx)\n", e->args.a0, e->args.a1, e->args.a2);
 
-    if(e->args.a1 == FUTEX_WAKE_PRIVATE) {
+    switch (e->args.a1) {
+    case FUTEX_WAIT:
+    case FUTEX_PRIVATE_FLAG:
+    case FUTEX_WAKE_PRIVATE:
+    case FUTEX_CMP_REQUEUE_PRIVATE:
         return TRACY_HOOK_CONTINUE;
     }
 
     return TRACY_HOOK_ABORT;
+}
+
+static int _sandbox_clone(struct tracy_event *e)
+{
+    static int clone_count = 0;
+    dprintf("clone(0x%lx, ...)\n", e->args.a0);
+    if(clone_count++ == g_max_clones) {
+        return TRACY_HOOK_ABORT;
+    }
+    return TRACY_HOOK_CONTINUE;
 }
 
 static int _sandbox_allow(struct tracy_event *e)
@@ -367,6 +383,12 @@ static int _zipjail_enter_sandbox(struct tracy_event *e)
         return TRACY_HOOK_ABORT;
     }
 
+    if(tracy_set_hook(e->child->tracy, "clone", e->abi,
+            &_sandbox_clone) < 0) {
+        fprintf(stderr, "Error setting clone(2) sandbox hook!\n");
+        return TRACY_HOOK_ABORT;
+    }
+
     for (const char **sc = g_syscall_allowed; *sc != NULL; sc++) {
         if(tracy_set_hook(e->child->tracy, *sc, e->abi,
                 &_sandbox_allow) < 0) {
@@ -406,12 +428,12 @@ int main(int argc, char *argv[])
 {
     if(argc < 4) {
         fprintf(stderr,
-            "zipjail 0.3.2 - safe unpacking of potentially unsafe archives.\n"
+            "zipjail 0.3.3 - safe unpacking of potentially unsafe archives.\n"
             "Copyright (C) 2016-2017, Jurriaan Bremer <jbr@cuckoo.sh>.\n"
             "Based on Tracy by Merlijn Wajer and Bas Weelinck.\n"
             "    (https://github.com/MerlijnWajer/tracy)\n"
             "\n"
-            "Usage: %s <input> <output> [-v] <command...>\n"
+            "Usage: %s <input> <output> [-v] [-c=/--clone=N] <command...>\n"
             "  input:   input archive file\n"
             "  output:  directory to extract files to\n"
             "  verbose: some verbosity\n"
@@ -428,6 +450,15 @@ int main(int argc, char *argv[])
 
     if(strcmp(argv[1], "-v") == 0) {
         g_verbose = 1;
+        argv++;
+    }
+
+    if(strncmp(argv[1], "-c=", 3) == 0) {
+        g_max_clones = strtoul(argv[1] + 3, NULL, 10);
+        argv++;
+    }
+    else if(strncmp(argv[1], "--clone=", 8) == 0) {
+        g_max_clones = strtoul(argv[1] + 8, NULL, 10);
         argv++;
     }
 
