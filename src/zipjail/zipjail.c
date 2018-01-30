@@ -43,7 +43,7 @@ static int g_max_clones;
 
 static const char *g_syscall_allowed[] = {
     "read", "write", "lseek", "stat", "fstat", "close", "umask", "lstat",
-    "exit_group", "fchmod", "utime", "getdents", "chmod", "munmap",
+    "exit_group", "fchmod", "utime", "getdents", "chmod", "munmap", "time",
     "rt_sigaction", "brk", "fcntl", "access", "getcwd", "chdir", "select",
     NULL,
 };
@@ -428,8 +428,8 @@ int main(int argc, char *argv[])
 {
     if(argc < 4) {
         fprintf(stderr,
-            "zipjail 0.3.3 - safe unpacking of potentially unsafe archives.\n"
-            "Copyright (C) 2016-2017, Jurriaan Bremer <jbr@cuckoo.sh>.\n"
+            "zipjail 0.3.4 - safe unpacking of potentially unsafe archives.\n"
+            "Copyright (C) 2016-2018, Jurriaan Bremer <jbr@cuckoo.sh>.\n"
             "Based on Tracy by Merlijn Wajer and Bas Weelinck.\n"
             "    (https://github.com/MerlijnWajer/tracy)\n"
             "\n"
