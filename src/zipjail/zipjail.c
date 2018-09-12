@@ -324,6 +324,12 @@ static int _zipjail_block(struct tracy_event *e)
     return TRACY_HOOK_ABORT;
 }
 
+#define H(name) \
+    if(tracy_set_hook(e->child->tracy, #name, e->abi, &_sandbox_##name) < 0) { \
+        fprintf(stderr, "Error setting %s(2) sandbox hook!\n", #name); \
+        return TRACY_HOOK_ABORT; \
+    }
+
 static int _zipjail_enter_sandbox(struct tracy_event *e)
 {
     if(tracy_unset_hook(e->child->tracy, "open", e->abi) < 0) {
@@ -331,63 +337,8 @@ static int _zipjail_enter_sandbox(struct tracy_event *e)
         return TRACY_HOOK_ABORT;
     }
 
-    if(tracy_set_hook(e->child->tracy, "open", e->abi, &_sandbox_open) < 0) {
-        fprintf(stderr, "Error setting open(2) sandbox hook!\n");
-        return TRACY_HOOK_ABORT;
-    }
-
-    if(tracy_set_hook(e->child->tracy, "openat", e->abi,
-            &_sandbox_openat) < 0) {
-        fprintf(stderr, "Error setting openat(2) sandbox hook!\n");
-        return TRACY_HOOK_ABORT;
-    }
-
-    if(tracy_set_hook(e->child->tracy, "unlink", e->abi,
-            &_sandbox_unlink) < 0) {
-        fprintf(stderr, "Error setting unlink(2) sandbox hook!\n");
-        return TRACY_HOOK_ABORT;
-    }
-
-    if(tracy_set_hook(e->child->tracy, "mkdir", e->abi,
-            &_sandbox_mkdir) < 0) {
-        fprintf(stderr, "Error setting mkdir(2) sandbox hook!\n");
-        return TRACY_HOOK_ABORT;
-    }
-
-    if(tracy_set_hook(e->child->tracy, "readlink", e->abi,
-            &_sandbox_readlink) < 0) {
-        fprintf(stderr, "Error setting readlink(2) sandbox hook!\n");
-        return TRACY_HOOK_ABORT;
-    }
-
-    if(tracy_set_hook(e->child->tracy, "mmap", e->abi, &_sandbox_mmap) < 0) {
-        fprintf(stderr, "Error setting mmap(2) sandbox hook!\n");
-        return TRACY_HOOK_ABORT;
-    }
-
-    if(tracy_set_hook(e->child->tracy, "mprotect", e->abi,
-            &_sandbox_mprotect) < 0) {
-        fprintf(stderr, "Error setting mprotect(2) sandbox hook!\n");
-        return TRACY_HOOK_ABORT;
-    }
-
-    if(tracy_set_hook(e->child->tracy, "ioctl", e->abi,
-            &_sandbox_ioctl) < 0) {
-        fprintf(stderr, "Error setting ioctl(2) sandbox hook!\n");
-        return TRACY_HOOK_ABORT;
-    }
-
-    if(tracy_set_hook(e->child->tracy, "futex", e->abi,
-            &_sandbox_futex) < 0) {
-        fprintf(stderr, "Error setting futex(2) sandbox hook!\n");
-        return TRACY_HOOK_ABORT;
-    }
-
-    if(tracy_set_hook(e->child->tracy, "clone", e->abi,
-            &_sandbox_clone) < 0) {
-        fprintf(stderr, "Error setting clone(2) sandbox hook!\n");
-        return TRACY_HOOK_ABORT;
-    }
+    H(open); H(openat); H(unlink); H(mkdir); H(readlink); H(mmap);
+    H(mprotect); H(ioctl); H(futex); H(clone);
 
     for (const char **sc = g_syscall_allowed; *sc != NULL; sc++) {
         if(tracy_set_hook(e->child->tracy, *sc, e->abi,
