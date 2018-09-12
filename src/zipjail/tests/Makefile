@@ -47,6 +47,10 @@ unpack:
 	../zipjail pw.7z /tmp/zipjail-simple --clone=1 -- 7z x -mmt=off -Pinfected -o/tmp/zipjail-simple pw.7z
 	rm -rf /tmp/zipjail-simple
 	../zipjail $(abspath simple.ace) /tmp/zipjail-simple -- unace x simple.ace /tmp/zipjail-simple/
+	rm -rf /tmp/zipjail-simple
+	../zipjail 64mb.zip /tmp/zipjail-simple --write=68108864 -- unzip -o -d /tmp/zipjail-simple 64mb.zip
+	rm -rf /tmp/zipjail-simple
+	! ../zipjail 64mb.zip /tmp/zipjail-simple --write=66108864 -- unzip -o -d /tmp/zipjail-simple 64mb.zip
 
 clean:
 	rm -f $(BINARY32) $(BINARY64)

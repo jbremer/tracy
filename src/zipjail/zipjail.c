@@ -40,9 +40,10 @@ static const char *g_dirpath;
 static int g_dirpath_length;
 static int g_verbose;
 static int g_max_clones;
+static uint64_t g_max_write = 1024 * 1024 * 1024; // One GB.
 
 static const char *g_syscall_allowed[] = {
-    "read", "write", "lseek", "stat", "fstat", "close", "umask", "lstat",
+    "read", "lseek", "stat", "fstat", "close", "umask", "lstat",
     "exit_group", "fchmod", "utime", "getdents", "chmod", "munmap", "time",
     "rt_sigaction", "brk", "fcntl", "access", "getcwd", "chdir", "select",
     NULL,
@@ -304,6 +305,22 @@ static int _sandbox_clone(struct tracy_event *e)
     return TRACY_HOOK_CONTINUE;
 }
 
+static int _sandbox_write(struct tracy_event *e)
+{
+    static uint64_t written = 0;
+
+    if(e->child->pre_syscall == 0) {
+        return TRACY_HOOK_CONTINUE;
+    }
+
+    written += e->args.a2;
+    if(written >= g_max_write) {
+        fprintf(stderr, "Excessive writing caused incomplete unpacking!\n");
+        return TRACY_HOOK_ABORT;
+    }
+    return TRACY_HOOK_CONTINUE;
+}
+
 static int _sandbox_allow(struct tracy_event *e)
 {
     (void) e;
@@ -338,7 +355,7 @@ static int _zipjail_enter_sandbox(struct tracy_event *e)
     }
 
     H(open); H(openat); H(unlink); H(mkdir); H(readlink); H(mmap);
-    H(mprotect); H(ioctl); H(futex); H(clone);
+    H(mprotect); H(ioctl); H(futex); H(clone); H(write);
 
     for (const char **sc = g_syscall_allowed; *sc != NULL; sc++) {
         if(tracy_set_hook(e->child->tracy, *sc, e->abi,
@@ -393,6 +410,8 @@ int main(int argc, char *argv[])
             "  -v           more verbosity\n"
             "  -c=N         more clones (default: 0)\n"
             "  --clone=N    same as -c=N\n"
+            "  -w=X         maximum total file size (default: 1GB)\n"
+            "  --write=X    same as -w=X\n"
             "\n"
             "Please refer to the README for the exact usage.\n",
             argv[0]
@@ -413,6 +432,16 @@ int main(int argc, char *argv[])
         }
         else if(strncmp(*argv, "--clone=", 8) == 0) {
             g_max_clones = strtoul(*argv + 8, NULL, 10);
+        }
+        else if(strncmp(*argv, "-w=", 3) == 0) {
+            g_max_write = strtoul(*argv + 3, NULL, 10);
+        }
+        else if(strncmp(*argv, "--write=", 8) == 0) {
+            g_max_write = strtoul(*argv + 8, NULL, 10);
+        }
+        else {
+            fprintf(stderr, "Error parsing command-line option!\n");
+            return -1;
         }
     }
 

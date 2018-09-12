@@ -35,6 +35,8 @@ directory to which file writes should be restricted.
       -v           more verbosity
       -c=N         more clones (default: 0)
       --clone=N    same as -c=N
+      -w=X         maximum total file size (default: 1GB)
+      --write=X    same as -w=X
 
     Please refer to the README for the exact usage.
 
