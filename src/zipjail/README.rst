@@ -33,6 +33,8 @@ directory to which file writes should be restricted.
 
     Options:
       -v           more verbosity
+      -a=X         terminates process after X seconds
+      --alarm=X    same as -a=X
       -c=N         more clones (default: 0)
       --clone=N    same as -c=N
       -w=X         maximum total file size (default: 1GB)

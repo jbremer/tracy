@@ -410,6 +410,8 @@ int main(int argc, char *argv[])
             "\n"
             "Options:\n"
             "  -v           more verbosity\n"
+            "  -a=X         terminates process after X seconds\n"
+            "  --alarm=X    same as -a=X\n"
             "  -c=N         more clones (default: 0)\n"
             "  --clone=N    same as -c=N\n"
             "  -w=X         maximum total file size (default: 1GB)\n"
@@ -425,9 +427,17 @@ int main(int argc, char *argv[])
     g_dirpath = *++argv;
     g_dirpath_length = strlen(g_dirpath);
 
-    for (argv++; *argv != NULL && strcmp(*argv, "--") != 0; argv++) {
+    uint32_t alarm_seconds = 120;
+
+    while (*++argv != NULL && strcmp(*argv, "--") != 0) {
         if(strcmp(*argv, "-v") == 0) {
             g_verbose = 1;
+        }
+        else if(strncmp(*argv, "-a=", 3) == 0) {
+            alarm_seconds = strtoul(*argv + 3, NULL, 10);
+        }
+        else if(strncmp(*argv, "--alarm=", 8) == 0) {
+            alarm_seconds = strtoul(*argv + 8, NULL, 10);
         }
         else if(strncmp(*argv, "-c=", 3) == 0) {
             g_max_clones = strtoul(*argv + 3, NULL, 10);
@@ -452,6 +462,9 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Error parsing command-line!\n");
         return -1;
     }
+
+    // Terminate zipjail after X seconds (default 120).
+    alarm(alarm_seconds);
 
     // We create the target directory just in case it does not already exist.
     // Without a dirpath that actually exists, unrar would otherwise unpack to

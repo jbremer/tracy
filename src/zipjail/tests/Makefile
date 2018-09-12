@@ -26,7 +26,7 @@ good/%.result: good/%.out
 	mkdir -p $(WORKDIR)
 	echo hello > $(WORKDIR)/a.c
 	echo world > $(WORKDIR)/a.py
-	../zipjail /tmp/zipjail-input /tmp/zipjail-dirtydir -- ./$^
+	../zipjail /tmp/zipjail-input /tmp/zipjail-dirtydir --alarm=4 -- ./$^
 
 bad/%.result: bad/%.out
 	touch /tmp/zipjail-input
@@ -34,7 +34,7 @@ bad/%.result: bad/%.out
 	mkdir -p $(WORKDIR)
 	echo hello > $(WORKDIR)/a.c
 	echo world > $(WORKDIR)/a.py
-	! ../zipjail /tmp/zipjail-input /tmp/zipjail-dirtydir -- ./$^
+	! ../zipjail /tmp/zipjail-input /tmp/zipjail-dirtydir --alarm=4 -- ./$^
 
 unpack:
 	rm -rf /tmp/zipjail-simple
