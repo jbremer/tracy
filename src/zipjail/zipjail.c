@@ -313,11 +313,13 @@ static int _sandbox_write(struct tracy_event *e)
         return TRACY_HOOK_CONTINUE;
     }
 
-    written += e->args.a2;
-    if(written >= g_max_write) {
+    if(written + e->args.a2 < written ||
+            written + e->args.a2 >= g_max_write) {
         fprintf(stderr, "Excessive writing caused incomplete unpacking!\n");
         return TRACY_HOOK_ABORT;
     }
+
+    written += e->args.a2;
     return TRACY_HOOK_CONTINUE;
 }
 
