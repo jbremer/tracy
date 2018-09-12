@@ -89,7 +89,7 @@ allows multiple threads that may be used for race conditions.
 
 .. code-block:: bash
 
-    $ zipjail pw.7z /tmp/unpacked --clone=2 -- \
+    $ zipjail pw.7z /tmp/unpacked --clone=1 -- \
         7z x -mmt=off -Pinfected -o/tmp/unpacked pw.7z
 
 unace

@@ -44,7 +44,7 @@ unpack:
 	rm -rf /tmp/zipjail-simple
 	../zipjail simple.7z /tmp/zipjail-simple -- 7z x -mmt=off -o/tmp/zipjail-simple simple.7z
 	rm -rf /tmp/zipjail-simple
-	../zipjail pw.7z /tmp/zipjail-simple --clone=2 -- 7z x -mmt=off -Pinfected -o/tmp/zipjail-simple pw.7z
+	../zipjail pw.7z /tmp/zipjail-simple --clone=1 -- 7z x -mmt=off -Pinfected -o/tmp/zipjail-simple pw.7z
 	rm -rf /tmp/zipjail-simple
 	../zipjail $(abspath simple.ace) /tmp/zipjail-simple -- unace x simple.ace /tmp/zipjail-simple/
 

@@ -298,7 +298,7 @@ static int _sandbox_clone(struct tracy_event *e)
 {
     static int clone_count = 0;
     dprintf("clone(0x%lx, ...)\n", e->args.a0);
-    if(clone_count++ == g_max_clones) {
+    if(e->child->pre_syscall == 1 && clone_count++ == g_max_clones) {
         return TRACY_HOOK_ABORT;
     }
     return TRACY_HOOK_CONTINUE;
