@@ -433,10 +433,15 @@ int main(int argc, char *argv[])
             "Based on Tracy by Merlijn Wajer and Bas Weelinck.\n"
             "    (https://github.com/MerlijnWajer/tracy)\n"
             "\n"
-            "Usage: %s <input> <output> [-v] [-c=/--clone=N] <command...>\n"
+            "Usage: %s <input> <output> [options...] -- <command...>\n"
             "  input:   input archive file\n"
             "  output:  directory to extract files to\n"
             "  verbose: some verbosity\n"
+            "\n"
+            "Options:\n"
+            "  -v           more verbosity\n"
+            "  -c=N         more clones (default: 0)\n"
+            "  --clone=N    same as -c=N\n"
             "\n"
             "Please refer to the README for the exact usage.\n",
             argv[0]
@@ -448,18 +453,22 @@ int main(int argc, char *argv[])
     g_dirpath = *++argv;
     g_dirpath_length = strlen(g_dirpath);
 
-    if(strcmp(argv[1], "-v") == 0) {
-        g_verbose = 1;
-        argv++;
+    for (argv++; *argv != NULL && strcmp(*argv, "--") != 0; argv++) {
+        if(strcmp(*argv, "-v") == 0) {
+            g_verbose = 1;
+        }
+        else if(strncmp(*argv, "-c=", 3) == 0) {
+            g_max_clones = strtoul(*argv + 3, NULL, 10);
+        }
+        else if(strncmp(*argv, "--clone=", 8) == 0) {
+            g_max_clones = strtoul(*argv + 8, NULL, 10);
+        }
     }
 
-    if(strncmp(argv[1], "-c=", 3) == 0) {
-        g_max_clones = strtoul(argv[1] + 3, NULL, 10);
-        argv++;
-    }
-    else if(strncmp(argv[1], "--clone=", 8) == 0) {
-        g_max_clones = strtoul(argv[1] + 8, NULL, 10);
-        argv++;
+    // This happens when no "--" separator has been used.
+    if(*argv == NULL) {
+        fprintf(stderr, "Error parsing command-line!\n");
+        return -1;
     }
 
     // We create the target directory just in case it does not already exist.

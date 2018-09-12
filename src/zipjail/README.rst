@@ -26,10 +26,15 @@ directory to which file writes should be restricted.
     Based on Tracy by Merlijn Wajer and Bas Weelinck.
         (https://github.com/MerlijnWajer/tracy)
 
-    Usage: zipjail <input> <output> [-v] [-c=/--clone=N] <command...>
+    Usage: zipjail <input> <output> [options...] -- <command...>
       input:   input archive file
       output:  directory to extract files to
       verbose: some verbosity
+
+    Options:
+      -v           more verbosity
+      -c=N         more clones (default: 0)
+      --clone=N    same as -c=N
 
     Please refer to the README for the exact usage.
 
@@ -44,7 +49,7 @@ constructed as follows.
 
 .. code-block:: bash
 
-    $ zipjail file.zip /tmp/unpacked unzip -o -d /tmp/unpacked file.zip
+    $ zipjail file.zip /tmp/unpacked -- unzip -o -d /tmp/unpacked file.zip
 
 Rar
 ^^^
@@ -57,7 +62,7 @@ is not capable of running with that version. So far we have only tested that
 
 .. code-block:: bash
 
-    $ zipjail file.rar /tmp/unpacked rar x -mt1 file.rar /tmp/unpacked
+    $ zipjail file.rar /tmp/unpacked -- rar x -mt1 file.rar /tmp/unpacked
 
 7z
 ^^
@@ -74,7 +79,7 @@ additional whitespaces).
 
 .. code-block:: bash
 
-    $ zipjail file.7z /tmp/unpacked 7z x -mmt=off -o/tmp/unpacked file.7z
+    $ zipjail file.7z /tmp/unpacked -- 7z x -mmt=off -o/tmp/unpacked file.7z
 
 In some cases, however, such as when decrypting a password-protected ``.7z``
 file, it appears that up to two additional threads are used, so in order to
@@ -84,8 +89,8 @@ allows multiple threads that may be used for race conditions.
 
 .. code-block:: bash
 
-    $ zipjail pw.7z /tmp/unpacked --clone=2 7z x -mmt=off \
-        -Pinfected -o/tmp/unpacked pw.7z
+    $ zipjail pw.7z /tmp/unpacked --clone=2 -- \
+        7z x -mmt=off -Pinfected -o/tmp/unpacked pw.7z
 
 unace
 ^^^^^
@@ -98,7 +103,8 @@ i.e., the path should finish off with a forward slash.
 
 .. code-block:: bash
 
-    $ zipjail /tmp/file.ace /tmp/unpacked unace x /tmp/file.ace /tmp/unpacked/
+    $ zipjail /tmp/file.ace /tmp/unpacked -- \
+        unace x /tmp/file.ace /tmp/unpacked/
 
 It should be noted that only ``unace`` version ``2.5`` is supported as the
 older versions don't support either the command-line arguments or the ``.ace``

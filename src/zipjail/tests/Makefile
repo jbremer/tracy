@@ -26,7 +26,7 @@ good/%.result: good/%.out
 	mkdir -p $(WORKDIR)
 	echo hello > $(WORKDIR)/a.c
 	echo world > $(WORKDIR)/a.py
-	../zipjail /tmp/zipjail-input /tmp/zipjail-dirtydir ./$^
+	../zipjail /tmp/zipjail-input /tmp/zipjail-dirtydir -- ./$^
 
 bad/%.result: bad/%.out
 	touch /tmp/zipjail-input
@@ -34,19 +34,19 @@ bad/%.result: bad/%.out
 	mkdir -p $(WORKDIR)
 	echo hello > $(WORKDIR)/a.c
 	echo world > $(WORKDIR)/a.py
-	! ../zipjail /tmp/zipjail-input /tmp/zipjail-dirtydir ./$^
+	! ../zipjail /tmp/zipjail-input /tmp/zipjail-dirtydir -- ./$^
 
 unpack:
 	rm -rf /tmp/zipjail-simple
-	../zipjail simple.zip /tmp/zipjail-simple unzip -o -d /tmp/zipjail-simple simple.zip
+	../zipjail simple.zip /tmp/zipjail-simple -- unzip -o -d /tmp/zipjail-simple simple.zip
 	rm -rf /tmp/zipjail-simple
-	../zipjail simple.rar /tmp/zipjail-simple rar x -mt1 simple.rar /tmp/zipjail-simple
+	../zipjail simple.rar /tmp/zipjail-simple -- rar x -mt1 simple.rar /tmp/zipjail-simple
 	rm -rf /tmp/zipjail-simple
-	../zipjail simple.7z /tmp/zipjail-simple 7z x -mmt=off -o/tmp/zipjail-simple simple.7z
+	../zipjail simple.7z /tmp/zipjail-simple -- 7z x -mmt=off -o/tmp/zipjail-simple simple.7z
 	rm -rf /tmp/zipjail-simple
-	../zipjail pw.7z /tmp/zipjail-simple --clone=2 7z x -mmt=off -Pinfected -o/tmp/zipjail-simple pw.7z
+	../zipjail pw.7z /tmp/zipjail-simple --clone=2 -- 7z x -mmt=off -Pinfected -o/tmp/zipjail-simple pw.7z
 	rm -rf /tmp/zipjail-simple
-	../zipjail $(abspath simple.ace) /tmp/zipjail-simple unace x simple.ace /tmp/zipjail-simple/
+	../zipjail $(abspath simple.ace) /tmp/zipjail-simple -- unace x simple.ace /tmp/zipjail-simple/
 
 clean:
 	rm -f $(BINARY32) $(BINARY64)
