@@ -208,13 +208,13 @@ static int _sandbox_mkdir(struct tracy_event *e)
 
     dprintf("mkdir(%s)\n", dirpath);
 
-    if(*dirpath == 0 || check_path(dirpath) == 0) {
-        return TRACY_HOOK_CONTINUE;
-    }
-
     // If the directory already exists we can just ignore this call anyway.
     struct stat st;
     if(lstat(dirpath, &st) == 0) {
+        return TRACY_HOOK_CONTINUE;
+    }
+
+    if(*dirpath == 0 || check_path(dirpath) == 0) {
         return TRACY_HOOK_CONTINUE;
     }
 
@@ -398,7 +398,7 @@ int main(int argc, char *argv[])
 {
     if(argc < 4) {
         fprintf(stderr,
-            "zipjail 0.4 - safe unpacking of potentially unsafe archives.\n"
+            "zipjail 0.4.1 - safe unpacking of potentially unsafe archives.\n"
             "Copyright (C) 2016-2018, Jurriaan Bremer <jbr@cuckoo.sh>.\n"
             "Copyright (C) 2018, Hatching B.V.\n"
             "Based on Tracy by Merlijn Wajer and Bas Weelinck.\n"
