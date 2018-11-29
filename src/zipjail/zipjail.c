@@ -33,7 +33,7 @@
 #include "tracyarch.h"
 
 #define MAXPATH 1023
-#define MAXFD 1023
+#define MAXFD 1024
 
 #define dprintf(...) \
     if(g_verbose != 0) printf(__VA_ARGS__)
@@ -72,15 +72,31 @@ static const char *g_open_mmap_r_shared_allowed[] = {
 };
 
 typedef enum {
-    FD_SOCKET = 1,
-    FD_MMAP_RX = 2,
-    FD_MMAP_R_SHARED = 4,
-    FD_DIRFD = 8,
+    FD_NONE,
+    FD_SOCKET,
+    FD_MMAP_RX,
+    FD_MMAP_R_SHARED,
+    FD_DIRFD,
 } fd_t;
 
-static int g_fds[MAXFD+1];
+static int g_fds[MAXFD];
 
 static struct tracy *g_tracy;
+
+static void set_fd(int fd, int value)
+{
+    if(fd >= 0 && fd < MAXFD) {
+        g_fds[fd] = value;
+    }
+}
+
+static int get_fd(int fd)
+{
+    if(fd >= 0 && fd < MAXFD) {
+        return g_fds[fd];
+    }
+    return 0;
+}
 
 static const char *read_path(
     struct tracy_event *e, const char *function, uintptr_t addr)
@@ -169,7 +185,7 @@ static int _sandbox_open(struct tracy_event *e)
         if((e->args.a1 & O_ACCMODE) == O_RDONLY &&
                 e->child->pre_syscall == 0 &&
                 strcmp(filepath, *p) == 0) {
-            g_fds[e->args.return_code] = FD_MMAP_RX;
+            set_fd(e->args.return_code, FD_MMAP_RX);
         }
     }
 
@@ -178,7 +194,7 @@ static int _sandbox_open(struct tracy_event *e)
         if((e->args.a1 & O_ACCMODE) == O_RDONLY &&
                 e->child->pre_syscall == 0 &&
                 strcmp(filepath, *p) == 0) {
-            g_fds[e->args.return_code] = FD_MMAP_R_SHARED;
+            set_fd(e->args.return_code, FD_MMAP_R_SHARED);
         }
     }
 
@@ -198,9 +214,7 @@ static int _sandbox_open(struct tracy_event *e)
 
 static int _sandbox_openat(struct tracy_event *e)
 {
-    if(e->args.a0 != AT_FDCWD && (
-            e->args.a0 >= 0 && e->args.a0 < MAXFD+1 &&
-            g_fds[e->args.a0] == FD_DIRFD) == 0) {
+    if(e->args.a0 != AT_FDCWD && get_fd(e->args.a0) != FD_DIRFD) {
         fprintf(stderr,
             "Invalid dirfd provided for openat(2) while in sandbox mode!\n"
             "ip=%p sp=%p abi=%ld\n",
@@ -210,9 +224,8 @@ static int _sandbox_openat(struct tracy_event *e)
     }
 
     if((e->args.a2 & O_ACCMODE) == O_RDONLY) {
-        if(e->child->pre_syscall == 0 && e->args.return_code >= 0 &&
-                e->args.return_code < MAXFD+1) {
-            g_fds[e->args.return_code] = FD_DIRFD;
+        if(e->child->pre_syscall == 0) {
+            set_fd(e->args.return_code, FD_DIRFD);
         }
         return TRACY_HOOK_CONTINUE;
     }
@@ -255,8 +268,7 @@ static int _sandbox_unlink(struct tracy_event *e)
 
 static int _sandbox_unlinkat(struct tracy_event *e)
 {
-    if(e->args.a0 < 0 || e->args.a0 > MAXFD ||
-            g_fds[e->args.a0] != FD_DIRFD) {
+    if(get_fd(e->args.a0) != FD_DIRFD) {
         return TRACY_HOOK_ABORT;
     }
 
@@ -296,8 +308,7 @@ static int _sandbox_mkdir(struct tracy_event *e)
 
 static int _sandbox_mkdirat(struct tracy_event *e)
 {
-    if(e->args.a0 < 0 || e->args.a0 > MAXFD ||
-            g_fds[e->args.a0] != FD_DIRFD) {
+    if(get_fd(e->args.a0) != FD_DIRFD) {
         return TRACY_HOOK_ABORT;
     }
 
@@ -337,16 +348,14 @@ static int _sandbox_readlink(struct tracy_event *e)
 
 static int _sandbox_mmap(struct tracy_event *e)
 {
-    if(e->args.a4 >= 0 && e->args.a4 < MAXFD+1) {
-        if((g_fds[e->args.a4] & FD_MMAP_RX) != 0 &&
+    if(get_fd(e->args.a4) == FD_MMAP_RX &&
                 (e->args.a2 & PROT_EXEC) == PROT_EXEC) {
-            return TRACY_HOOK_CONTINUE;
-        }
+        return TRACY_HOOK_CONTINUE;
+    }
 
-        if((g_fds[e->args.a4] & FD_MMAP_R_SHARED) != 0 &&
-                (e->args.a3 & MAP_SHARED) == MAP_SHARED) {
-            return TRACY_HOOK_CONTINUE;
-        }
+    if(get_fd(e->args.a4) == FD_MMAP_R_SHARED &&
+            (e->args.a3 & MAP_SHARED) == MAP_SHARED) {
+        return TRACY_HOOK_CONTINUE;
     }
 
     if((e->args.a2 & PROT_EXEC) == PROT_EXEC) {
@@ -442,7 +451,7 @@ static int _sandbox_socket(struct tracy_event *e)
         return TRACY_HOOK_ABORT;
     }
     if(e->child->pre_syscall == 0) {
-        g_fds[e->args.return_code] = FD_SOCKET;
+        set_fd(e->args.return_code, FD_SOCKET);
     }
     return TRACY_HOOK_CONTINUE;
 }
@@ -451,8 +460,7 @@ static int _sandbox_connect(struct tracy_event *e)
 {
     static struct sockaddr_un sa;
 
-    if(e->args.a0 < 0 || e->args.a0 > MAXFD ||
-            g_fds[e->args.a0] != FD_SOCKET) {
+    if(get_fd(e->args.a0) != FD_SOCKET) {
         fprintf(stderr, "Invalid fd for connect(2) call!\n");
         return TRACY_HOOK_ABORT;
     }
@@ -478,7 +486,7 @@ static int _sandbox_connect(struct tracy_event *e)
 static int _sandbox_close(struct tracy_event *e)
 {
     if(e->child->pre_syscall == 1) {
-        g_fds[e->args.a0] = 0;
+        set_fd(e->args.a0, FD_NONE);
     }
     return TRACY_HOOK_CONTINUE;
 }
@@ -566,7 +574,7 @@ int main(int argc, char *argv[])
 {
     if(argc < 4) {
         fprintf(stderr,
-            "zipjail 0.4.1 - safe unpacking of potentially unsafe archives.\n"
+            "zipjail 0.4.2 - safe unpacking of potentially unsafe archives.\n"
             "Copyright (C) 2016-2018, Jurriaan Bremer <jbr@cuckoo.sh>.\n"
             "Copyright (C) 2018, Hatching B.V.\n"
             "Based on Tracy by Merlijn Wajer and Bas Weelinck.\n"
