@@ -24,6 +24,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <fcntl.h>
 #include <asm/ioctls.h>
 #include <linux/futex.h>
@@ -31,6 +33,7 @@
 #include "tracyarch.h"
 
 #define MAXPATH 1023
+#define MAXFD 1023
 
 #define dprintf(...) \
     if(g_verbose != 0) printf(__VA_ARGS__)
@@ -43,7 +46,7 @@ static int g_max_clones;
 static uint64_t g_max_write = 1024 * 1024 * 1024; // One GB.
 
 static const char *g_syscall_allowed[] = {
-    "read", "lseek", "stat", "fstat", "close", "umask", "lstat",
+    "read", "lseek", "stat", "fstat", "umask", "lstat",
     "exit_group", "fchmod", "utime", "getdents", "chmod", "munmap", "time",
     "rt_sigaction", "brk", "fcntl", "access", "getcwd", "chdir", "select",
     NULL,
@@ -53,6 +56,12 @@ static const char *g_openat_allowed[] = {
     "/sys/devices/system/cpu",
     NULL,
 };
+
+typedef enum {
+    FD_SOCKET = 1,
+} fd_t;
+
+static int g_fds[MAXFD+1];
 
 static const char *read_path(
     struct tracy_event *e, const char *function, uintptr_t addr)
@@ -323,6 +332,56 @@ static int _sandbox_write(struct tracy_event *e)
     return TRACY_HOOK_CONTINUE;
 }
 
+static int _sandbox_socket(struct tracy_event *e)
+{
+    if(e->args.a0 != AF_LOCAL ||
+            e->args.a1 != (SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK) ||
+            e->args.a2 != 0) {
+        fprintf(stderr, "Blocking non-AF_LOCAL socket(2) call!\n");
+        return TRACY_HOOK_ABORT;
+    }
+    if(e->child->pre_syscall == 0) {
+        g_fds[e->args.return_code] = FD_SOCKET;
+    }
+    return TRACY_HOOK_CONTINUE;
+}
+
+static int _sandbox_connect(struct tracy_event *e)
+{
+    static struct sockaddr_un sa;
+
+    if(e->args.a0 < 0 || e->args.a0 > MAXFD+1 ||
+            g_fds[e->args.a0] != FD_SOCKET) {
+        fprintf(stderr, "Invalid fd for connect(2) call!\n");
+        return TRACY_HOOK_ABORT;
+    }
+
+    if(e->args.a2 != sizeof(struct sockaddr_un)) {
+        fprintf(stderr, "Invalid sockaddr_un struct for connect(2) call!\n");
+        return TRACY_HOOK_ABORT;
+    }
+
+    if(tracy_read_mem(e->child, &sa, (void *) e->args.a1,
+            sizeof(struct sockaddr_un)) < 0) {
+        fprintf(stderr, "Invalid sockaddr_un struct for connect(2) call!\n");
+        return TRACY_HOOK_ABORT;
+    }
+
+    if(strcmp(sa.sun_path, "/var/run/nscd/socket") != 0) {
+        return TRACY_HOOK_ABORT;
+    }
+
+    return TRACY_HOOK_CONTINUE;
+}
+
+static int _sandbox_close(struct tracy_event *e)
+{
+    if(e->child->pre_syscall == 1) {
+        g_fds[e->args.a0] = 0;
+    }
+    return TRACY_HOOK_CONTINUE;
+}
+
 static int _sandbox_allow(struct tracy_event *e)
 {
     (void) e;
@@ -357,7 +416,8 @@ static int _zipjail_enter_sandbox(struct tracy_event *e)
     }
 
     H(open); H(openat); H(unlink); H(mkdir); H(readlink); H(mmap);
-    H(mprotect); H(ioctl); H(futex); H(clone); H(write);
+    H(mprotect); H(ioctl); H(futex); H(clone); H(write); H(socket);
+    H(connect); H(close);
 
     for (const char **sc = g_syscall_allowed; *sc != NULL; sc++) {
         if(tracy_set_hook(e->child->tracy, *sc, e->abi,
