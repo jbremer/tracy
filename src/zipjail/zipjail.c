@@ -46,7 +46,7 @@ static int g_max_clones;
 static uint64_t g_max_write = 1024 * 1024 * 1024; // One GB.
 
 static const char *g_syscall_allowed[] = {
-    "read", "lseek", "stat", "fstat", "umask", "lstat",
+    "read", "lseek", "stat", "fstat", "umask", "lstat", "utimensat",
     "exit_group", "fchmod", "utime", "getdents", "chmod", "munmap", "time",
     "rt_sigaction", "brk", "fcntl", "access", "getcwd", "chdir", "select",
     NULL,
@@ -57,8 +57,25 @@ static const char *g_openat_allowed[] = {
     NULL,
 };
 
+static const char *g_open_mmap_rx_allowed[] = {
+    "/lib/x86_64-linux-gnu/libnsl.so.1",
+    "/lib/x86_64-linux-gnu/libnss_compat.so.2",
+    "/lib/x86_64-linux-gnu/libnss_files.so.2",
+    "/lib/x86_64-linux-gnu/libnss_nis.so.2",
+    NULL,
+};
+
+static const char *g_open_mmap_r_shared_allowed[] = {
+    "/etc/passwd",
+    "/etc/group",
+    NULL,
+};
+
 typedef enum {
     FD_SOCKET = 1,
+    FD_MMAP_RX = 2,
+    FD_MMAP_R_SHARED = 4,
+    FD_DIRFD = 8,
 } fd_t;
 
 static int g_fds[MAXFD+1];
@@ -100,8 +117,10 @@ static int check_path(const char *filepath)
         return 0;
     }
 
-    if(strncmp(filepath, g_dirpath, strlen(g_dirpath)) != 0 ||
-            filepath[g_dirpath_length] != '/') {
+    // Allow relative paths too, e.g., for openat(2) and mkdirat(2).
+    if(filepath[0] == '/' && (
+            strncmp(filepath, g_dirpath, strlen(g_dirpath)) != 0 ||
+            filepath[g_dirpath_length] != '/')) {
         fprintf(stderr,
             "Detected potential out-of-path arbitrary overwrite!\n"
             "filepath=%s dirpath=%s\n", filepath, g_dirpath
@@ -143,6 +162,24 @@ static int _sandbox_open(struct tracy_event *e)
         return TRACY_HOOK_ABORT;
     }
 
+    // We allow tar(1) to mmap(RX) some memory.
+    for (const char **p = g_open_mmap_rx_allowed; *p != NULL; p++) {
+        if((e->args.a1 & O_ACCMODE) == O_RDONLY &&
+                e->child->pre_syscall == 0 &&
+                strcmp(filepath, *p) == 0) {
+            g_fds[e->args.return_code] = FD_MMAP_RX;
+        }
+    }
+
+    // We allow tar(1) to mmap(R, MAP_SHARED) some memory.
+    for (const char **p = g_open_mmap_r_shared_allowed; *p != NULL; p++) {
+        if((e->args.a1 & O_ACCMODE) == O_RDONLY &&
+                e->child->pre_syscall == 0 &&
+                strcmp(filepath, *p) == 0) {
+            g_fds[e->args.return_code] = FD_MMAP_R_SHARED;
+        }
+    }
+
     // We accept open(..., O_RDONLY).
     if((e->args.a1 & O_ACCMODE) == O_RDONLY) {
         return TRACY_HOOK_CONTINUE;
@@ -159,7 +196,9 @@ static int _sandbox_open(struct tracy_event *e)
 
 static int _sandbox_openat(struct tracy_event *e)
 {
-    if(e->args.a0 != AT_FDCWD) {
+    if(e->args.a0 != AT_FDCWD && (
+            e->args.a0 >= 0 && e->args.a0 < MAXFD+1 &&
+            g_fds[e->args.a0] == FD_DIRFD) == 0) {
         fprintf(stderr,
             "Invalid dirfd provided for openat(2) while in sandbox mode!\n"
             "ip=%p sp=%p abi=%ld\n",
@@ -169,6 +208,10 @@ static int _sandbox_openat(struct tracy_event *e)
     }
 
     if((e->args.a2 & O_ACCMODE) == O_RDONLY) {
+        if(e->child->pre_syscall == 0 && e->args.return_code >= 0 &&
+                e->args.return_code < MAXFD+1) {
+            g_fds[e->args.return_code] = FD_DIRFD;
+        }
         return TRACY_HOOK_CONTINUE;
     }
 
@@ -208,6 +251,25 @@ static int _sandbox_unlink(struct tracy_event *e)
     return TRACY_HOOK_CONTINUE;
 }
 
+static int _sandbox_unlinkat(struct tracy_event *e)
+{
+    if(e->args.a0 < 0 || e->args.a0 > MAXFD ||
+            g_fds[e->args.a0] != FD_DIRFD) {
+        return TRACY_HOOK_ABORT;
+    }
+
+    const char *filepath = read_path(e, "unlinkat", e->args.a1);
+    if(filepath == NULL) {
+        return TRACY_HOOK_ABORT;
+    }
+
+    if(check_path2(filepath) < 0) {
+        return TRACY_HOOK_ABORT;
+    }
+
+    return TRACY_HOOK_CONTINUE;
+}
+
 static int _sandbox_mkdir(struct tracy_event *e)
 {
     const char *dirpath = read_path(e, "mkdir", e->args.a0);
@@ -220,6 +282,31 @@ static int _sandbox_mkdir(struct tracy_event *e)
     // If the directory already exists we can just ignore this call anyway.
     struct stat st;
     if(lstat(dirpath, &st) == 0) {
+        return TRACY_HOOK_CONTINUE;
+    }
+
+    if(*dirpath == 0 || check_path(dirpath) == 0) {
+        return TRACY_HOOK_CONTINUE;
+    }
+
+    return TRACY_HOOK_ABORT;
+}
+
+static int _sandbox_mkdirat(struct tracy_event *e)
+{
+    if(e->args.a0 < 0 || e->args.a0 > MAXFD ||
+            g_fds[e->args.a0] != FD_DIRFD) {
+        return TRACY_HOOK_ABORT;
+    }
+
+    const char *dirpath = read_path(e, "mkdirat", e->args.a1);
+    if(dirpath == NULL) {
+        return TRACY_HOOK_ABORT;
+    }
+
+    // If the directory already exists we can just ignore this call anyway.
+    struct stat st;
+    if(dirpath[0] == '/' && lstat(dirpath, &st) == 0) {
         return TRACY_HOOK_CONTINUE;
     }
 
@@ -248,6 +335,18 @@ static int _sandbox_readlink(struct tracy_event *e)
 
 static int _sandbox_mmap(struct tracy_event *e)
 {
+    if(e->args.a4 >= 0 && e->args.a4 < MAXFD+1) {
+        if((g_fds[e->args.a4] & FD_MMAP_RX) != 0 &&
+                (e->args.a2 & PROT_EXEC) == PROT_EXEC) {
+            return TRACY_HOOK_CONTINUE;
+        }
+
+        if((g_fds[e->args.a4] & FD_MMAP_R_SHARED) != 0 &&
+                (e->args.a3 & MAP_SHARED) == MAP_SHARED) {
+            return TRACY_HOOK_CONTINUE;
+        }
+    }
+
     if((e->args.a2 & PROT_EXEC) == PROT_EXEC) {
         fprintf(stderr,
             "Blocked mmap(2) syscall with X flag set!\n"
@@ -350,7 +449,7 @@ static int _sandbox_connect(struct tracy_event *e)
 {
     static struct sockaddr_un sa;
 
-    if(e->args.a0 < 0 || e->args.a0 > MAXFD+1 ||
+    if(e->args.a0 < 0 || e->args.a0 > MAXFD ||
             g_fds[e->args.a0] != FD_SOCKET) {
         fprintf(stderr, "Invalid fd for connect(2) call!\n");
         return TRACY_HOOK_ABORT;
@@ -417,7 +516,7 @@ static int _zipjail_enter_sandbox(struct tracy_event *e)
 
     H(open); H(openat); H(unlink); H(mkdir); H(readlink); H(mmap);
     H(mprotect); H(ioctl); H(futex); H(clone); H(write); H(socket);
-    H(connect); H(close);
+    H(connect); H(close); H(mkdirat); H(unlinkat);
 
     for (const char **sc = g_syscall_allowed; *sc != NULL; sc++) {
         if(tracy_set_hook(e->child->tracy, *sc, e->abi,
