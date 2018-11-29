@@ -80,6 +80,8 @@ typedef enum {
 
 static int g_fds[MAXFD+1];
 
+static struct tracy *g_tracy;
+
 static const char *read_path(
     struct tracy_event *e, const char *function, uintptr_t addr)
 {
@@ -553,6 +555,11 @@ static int _trigger_open(struct tracy_event *e)
     return TRACY_HOOK_CONTINUE;
 }
 
+void kill_children(int arg0)
+{
+    tracy_free(g_tracy);
+}
+
 int main(int argc, char *argv[])
 {
     if(argc < 4) {
@@ -623,6 +630,12 @@ int main(int argc, char *argv[])
         return -1;
     }
 
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(struct sigaction));
+
+    sa.sa_handler = &kill_children;
+    sigaction(SIGALRM, &sa, NULL);
+
     // Terminate zipjail after X seconds (default 120).
     alarm(alarm_seconds);
 
@@ -631,22 +644,22 @@ int main(int argc, char *argv[])
     // the current directory rather than our expected dirpath.
     mkdir(g_dirpath, 0775);
 
-    struct tracy *tracy = tracy_init(0);
+    g_tracy = tracy_init(0);
 
 #if __x86_64__
-    if(tracy_set_hook(tracy, "open", TRACY_ABI_AMD64, &_trigger_open) < 0) {
+    if(tracy_set_hook(g_tracy, "open", TRACY_ABI_AMD64, &_trigger_open) < 0) {
         fprintf(stderr, "Error hooking open(2)\n");
         return -1;
     }
 #endif
 
-    if(tracy_set_hook(tracy, "open", TRACY_ABI_X86, &_trigger_open) < 0) {
+    if(tracy_set_hook(g_tracy, "open", TRACY_ABI_X86, &_trigger_open) < 0) {
         fprintf(stderr, "Error hooking open(2)\n");
         return -1;
     }
 
-    tracy_exec(tracy, ++argv);
-    tracy_main(tracy);
-    tracy_free(tracy);
+    tracy_exec(g_tracy, ++argv);
+    tracy_main(g_tracy);
+    tracy_free(g_tracy);
     return 0;
 }
