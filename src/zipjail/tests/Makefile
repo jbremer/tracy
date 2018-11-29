@@ -46,6 +46,10 @@ unpack:
 	rm -rf /tmp/zipjail-simple
 	../zipjail simple.tar /tmp/zipjail-simple -- tar xfv simple.tar -C /tmp/zipjail-simple
 	rm -rf /tmp/zipjail-simple
+	../zipjail simple.tar /tmp/zipjail-simple -- tar xfvz simple.tar.gz -C /tmp/zipjail-simple
+	rm -rf /tmp/zipjail-simple
+	../zipjail simple.tar /tmp/zipjail-simple -- tar xfvj simple.tar.bz2 -C /tmp/zipjail-simple
+	rm -rf /tmp/zipjail-simple
 	../zipjail pw.7z /tmp/zipjail-simple --clone=1 -- 7z x -mmt=off -Pinfected -o/tmp/zipjail-simple pw.7z
 	rm -rf /tmp/zipjail-simple
 	../zipjail $(abspath simple.ace) /tmp/zipjail-simple -- unace x simple.ace /tmp/zipjail-simple/

@@ -557,6 +557,8 @@ static int _trigger_open(struct tracy_event *e)
 
 void kill_children(int arg0)
 {
+    (void) arg0;
+
     tracy_free(g_tracy);
 }
 
