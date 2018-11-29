@@ -2,9 +2,9 @@ ZipJail
 =======
 
 ZipJail is a usermode sandbox for unpacking archives using the ``unzip``,
-``rar``, ``7z``, and ``unace`` utilities. Through the use of the ``tracy``
-library it limits the attack surfaces to an absolute minimum in case a
-malicious archive tries to exploit known or unknown vulnerabilities in said
+``tar``, ``rar``, ``7z``, and ``unace`` utilities. Through the use of the
+``tracy`` library it limits the attack surfaces to an absolute minimum in case
+a malicious archive tries to exploit known or unknown vulnerabilities in said
 archive tools.
 
 **Motivation behind this small wrapper utility** may be found in the
@@ -21,8 +21,9 @@ directory to which file writes should be restricted.
 .. code-block:: bash
 
     $ zipjail
-    zipjail 0.3.4 - safe unpacking of potentially unsafe archives.
-    Copyright (C) 2016-2018, Jurriaan Bremer <jbr@cuckoo.sh>.
+    zipjail 0.4.3 - safe unpacking of potentially unsafe archives.
+    Copyright (C) 2016-2018, Jurriaan Bremer <jbr@hatching.io>.
+    Copyright (C) 2018, Hatching B.V.
     Based on Tracy by Merlijn Wajer and Bas Weelinck.
         (https://github.com/MerlijnWajer/tracy)
 
@@ -54,6 +55,18 @@ constructed as follows.
 .. code-block:: bash
 
     $ zipjail file.zip /tmp/unpacked -- unzip -o -d /tmp/unpacked file.zip
+
+Tar
+^^^
+
+In order to run ``zipjail`` with ``tar`` the command-line should be
+constructed as follows.
+
+.. code-block:: bash
+
+    $ zipjail file.tar     /tmp/unpacked -- tar xfv  file.tar     -C /tmp/unpacked
+    $ zipjail file.tar.gz  /tmp/unpacked -- tar xfvz file.tar.gz  -C /tmp/unpacked
+    $ zipjail file.tar.bz2 /tmp/unpacked -- tar xfvj file.tar.bz2 -C /tmp/unpacked
 
 Rar
 ^^^

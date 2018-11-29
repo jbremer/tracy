@@ -46,6 +46,8 @@ unpack:
 	rm -rf /tmp/zipjail-simple
 	../zipjail simple.tar /tmp/zipjail-simple -- tar xfv simple.tar -C /tmp/zipjail-simple
 	rm -rf /tmp/zipjail-simple
+	../zipjail simple2.tar /tmp/zipjail-simple -- tar xfv simple2.tar -C /tmp/zipjail-simple
+	rm -rf /tmp/zipjail-simple
 	../zipjail simple.tar /tmp/zipjail-simple -- tar xfvz simple.tar.gz -C /tmp/zipjail-simple
 	rm -rf /tmp/zipjail-simple
 	../zipjail simple.tar /tmp/zipjail-simple -- tar xfvj simple.tar.bz2 -C /tmp/zipjail-simple
