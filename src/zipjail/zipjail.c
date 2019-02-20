@@ -49,7 +49,7 @@ static const char *g_syscall_allowed[] = {
     "read", "lseek", "stat", "fstat", "umask", "lstat", "utimensat",
     "exit_group", "fchmod", "utime", "getdents", "chmod", "munmap", "time",
     "rt_sigaction", "brk", "fcntl", "access", "getcwd", "chdir", "select",
-    "newfstatat", NULL,
+    "newfstatat", "fstat64", "_llseek", "gettimeofday", "stat64", NULL,
 };
 
 static const char *g_openat_allowed[] = {
@@ -574,9 +574,9 @@ int main(int argc, char *argv[])
 {
     if(argc < 4) {
         fprintf(stderr,
-            "zipjail 0.4.3 - safe unpacking of potentially unsafe archives.\n"
+            "zipjail 0.4.4 - safe unpacking of potentially unsafe archives.\n"
             "Copyright (C) 2016-2018, Jurriaan Bremer <jbr@hatching.io>.\n"
-            "Copyright (C) 2018, Hatching B.V.\n"
+            "Copyright (C) 2018-2019, Hatching B.V.\n"
             "Based on Tracy by Merlijn Wajer and Bas Weelinck.\n"
             "    (https://github.com/MerlijnWajer/tracy)\n"
             "\n"

@@ -21,9 +21,9 @@ directory to which file writes should be restricted.
 .. code-block:: bash
 
     $ zipjail
-    zipjail 0.4.3 - safe unpacking of potentially unsafe archives.
+    zipjail 0.4.4 - safe unpacking of potentially unsafe archives.
     Copyright (C) 2016-2018, Jurriaan Bremer <jbr@hatching.io>.
-    Copyright (C) 2018, Hatching B.V.
+    Copyright (C) 2018-2019, Hatching B.V.
     Based on Tracy by Merlijn Wajer and Bas Weelinck.
         (https://github.com/MerlijnWajer/tracy)
 
@@ -128,13 +128,24 @@ older versions don't support either the command-line arguments or the ``.ace``
 samples that are actually being used in-the-wild. Installing this particular
 version may be done through ``sudo apt install unace-nonfree``.
 
+PowerISO
+^^^^^^^^
+
+In order to run ``zipjail`` with ``poweriso`` the command-line should be
+constructed as follows.
+
+.. code-block:: bash
+
+    $ zipjail file.zip /tmp/unpacked -- \
+        poweriso extract file.daa -od /tmp/unpacked
+
 Security
 ========
 
 Given its security implications (and use in, e.g., `Cuckoo Sandbox`_) it is of
 utmost importance that ``zipjail`` is completely secure. Therefore, may you
 locate a potential security issue, please reach out to us at
-``jbr@cuckoo.sh``.
+``jbr@hatching.io``.
 
 There has been some public research into vulnerabilities and exploits aiming
 at archive implementations in particular. Following is a non-complete list of
