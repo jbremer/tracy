@@ -214,7 +214,7 @@ static int _sandbox_open(struct tracy_event *e)
 
 static int _sandbox_openat(struct tracy_event *e)
 {
-    if(e->args.a0 != AT_FDCWD && get_fd(e->args.a0) != FD_DIRFD) {
+    if((int32_t) e->args.a0 != AT_FDCWD && get_fd(e->args.a0) != FD_DIRFD) {
         fprintf(stderr,
             "Invalid dirfd provided for openat(2) while in sandbox mode!\n"
             "ip=%p sp=%p abi=%ld\n",
@@ -520,7 +520,12 @@ static int _zipjail_block(struct tracy_event *e)
 static int _zipjail_enter_sandbox(struct tracy_event *e)
 {
     if(tracy_unset_hook(e->child->tracy, "open", e->abi) < 0) {
-        fprintf(stderr, "Error unsetting open trigger hook!\n");
+        fprintf(stderr, "Error unsetting open(2) trigger hook!\n");
+        return TRACY_HOOK_ABORT;
+    }
+
+    if(tracy_unset_hook(e->child->tracy, "openat", e->abi) < 0) {
+        fprintf(stderr, "Error unsetting openat(2) trigger hook!\n");
         return TRACY_HOOK_ABORT;
     }
 
@@ -548,12 +553,37 @@ static int _zipjail_enter_sandbox(struct tracy_event *e)
 
 static int _trigger_open(struct tracy_event *e)
 {
+    if(e->child->pre_syscall == 0) {
+        return TRACY_HOOK_CONTINUE;
+    }
+
     const char *filepath = read_path(e, "open", e->args.a0);
     if(filepath == NULL) {
         return TRACY_HOOK_ABORT;
     }
 
     dprintf("open(%s)\n", filepath);
+
+    // Enter sandboxing mode.
+    if(strcmp(filepath, g_filepath) == 0) {
+        return _zipjail_enter_sandbox(e);
+    }
+
+    return TRACY_HOOK_CONTINUE;
+}
+
+static int _trigger_openat(struct tracy_event *e)
+{
+    if(e->child->pre_syscall == 0) {
+        return TRACY_HOOK_CONTINUE;
+    }
+
+    const char *filepath = read_path(e, "openat", e->args.a1);
+    if(filepath == NULL) {
+        return TRACY_HOOK_ABORT;
+    }
+
+    dprintf("openat(%s)\n", filepath);
 
     // Enter sandboxing mode.
     if(strcmp(filepath, g_filepath) == 0) {
@@ -574,7 +604,7 @@ int main(int argc, char *argv[])
 {
     if(argc < 4) {
         fprintf(stderr,
-            "zipjail 0.4.4 - safe unpacking of potentially unsafe archives.\n"
+            "zipjail 0.5 - safe unpacking of potentially unsafe archives.\n"
             "Copyright (C) 2016-2018, Jurriaan Bremer <jbr@hatching.io>.\n"
             "Copyright (C) 2018-2019, Hatching B.V.\n"
             "Based on Tracy by Merlijn Wajer and Bas Weelinck.\n"
@@ -630,14 +660,14 @@ int main(int argc, char *argv[])
         }
         else {
             fprintf(stderr, "Error parsing command-line option!\n");
-            return -1;
+            return 1;
         }
     }
 
     // This happens when no "--" separator has been used.
     if(*argv == NULL) {
         fprintf(stderr, "Error parsing command-line!\n");
-        return -1;
+        return 1;
     }
 
     struct sigaction sa;
@@ -659,13 +689,21 @@ int main(int argc, char *argv[])
 #if __x86_64__
     if(tracy_set_hook(g_tracy, "open", TRACY_ABI_AMD64, &_trigger_open) < 0) {
         fprintf(stderr, "Error hooking open(2)\n");
-        return -1;
+        return 1;
+    }
+    if(tracy_set_hook(g_tracy, "openat", TRACY_ABI_AMD64, &_trigger_openat) < 0) {
+        fprintf(stderr, "Error hooking open(2)\n");
+        return 1;
     }
 #endif
 
     if(tracy_set_hook(g_tracy, "open", TRACY_ABI_X86, &_trigger_open) < 0) {
         fprintf(stderr, "Error hooking open(2)\n");
-        return -1;
+        return 1;
+    }
+    if(tracy_set_hook(g_tracy, "openat", TRACY_ABI_X86, &_trigger_openat) < 0) {
+        fprintf(stderr, "Error hooking open(2)\n");
+        return 1;
     }
 
     tracy_exec(g_tracy, ++argv);
