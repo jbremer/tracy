@@ -19,6 +19,8 @@
 #include <sys/wait.h>
 #include <sys/syscall.h>
 #include <sys/ptrace.h>
+#include <sys/uio.h>
+#include <linux/elf.h>
 
 #include "tracy.h"
 
@@ -109,7 +111,15 @@ int tracy_inject_syscall_pre_start(struct tracy_child *child, long syscall_numbe
         struct tracy_sc_args *a, tracy_hook_func callback) {
     /* TODO CHECK PRE_SYSCALL BIT */
 
+#   if defined(__arm64__) || defined(__aarch64__)
+    struct iovec iov;
+    iov.iov_base = (void*) &child->inj.reg;
+    iov.iov_len  = sizeof(child->inj.reg);
+
+    ptrace(PTRACE_GETREGSET, child->pid, NT_PRSTATUS, &iov);
+#   else
     PTRACE_CHECK(PTRACE_GETREGS, child->pid, 0, &child->inj.reg, -1);
+#   endif
 
     child->inj.cb = callback;
     child->inj.injecting = 1;
@@ -136,7 +146,15 @@ int tracy_inject_syscall_pre_start(struct tracy_child *child, long syscall_numbe
 int tracy_inject_syscall_pre_end(struct tracy_child *child, long *return_code) {
     struct TRACY_REGS_NAME newargs;
 
+#   if defined(__arm64__) || defined(__aarch64__)
+    struct iovec iov;
+    iov.iov_base = (void*) &newargs;
+    iov.iov_len  = sizeof(newargs);
+
+    ptrace(PTRACE_GETREGSET, child->pid, NT_PRSTATUS, &iov);
+#   else
     PTRACE_CHECK(PTRACE_GETREGS, child->pid, 0, &newargs, -1);
+#   endif
 
     *return_code = newargs.TRACY_RETURN_CODE;
 
@@ -146,7 +164,14 @@ int tracy_inject_syscall_pre_end(struct tracy_child *child, long *return_code) {
     /* vvvv This is probably not required vvvv */
     child->inj.reg.TRACY_SYSCALL_N = child->inj.reg.TRACY_SYSCALL_REGISTER;
 
+#   if defined(__arm64__) || defined(__aarch64__)
+    iov.iov_base = (void*) &child->inj.reg;
+    iov.iov_len  = sizeof(child->inj.reg);
+
+    ptrace(PTRACE_SETREGSET, child->pid, NT_PRSTATUS, &iov);
+#   else
     PTRACE_CHECK(PTRACE_SETREGS, child->pid, 0, &child->inj.reg, -1);
+#   endif
 
     PTRACE_CHECK(PTRACE_SYSCALL, child->pid, NULL, 0, -1);
 
@@ -173,19 +198,41 @@ int tracy_inject_syscall_post_start(struct tracy_child *child, long syscall_numb
     struct TRACY_REGS_NAME newargs;
 
     /* TODO CHECK PRE_SYSCALL BIT */
+#   if defined(__arm64__) || defined(__aarch64__)
+    struct iovec iov;
+    iov.iov_base = (void*) &child->inj.reg;
+    iov.iov_len  = sizeof(child->inj.reg);
+
+    ptrace(PTRACE_GETREGSET, child->pid, NT_PRSTATUS, &iov);
+#   else
     PTRACE_CHECK(PTRACE_GETREGS, child->pid, 0, &child->inj.reg, -1);
+#   endif
 
     child->inj.cb = callback;
     child->inj.injecting = 1;
     child->inj.pre = 0;
     child->inj.syscall_num = syscall_number;
 
+#   if defined(__arm64__) || defined(__aarch64__)
+    iov.iov_base = (void*) &newargs;
+    iov.iov_len  = sizeof(newargs);
+
+    ptrace(PTRACE_GETREGSET, child->pid, NT_PRSTATUS, &iov);
+#   else
     PTRACE_CHECK(PTRACE_GETREGS, child->pid, 0, &newargs, -1);
+#   endif
 
     /* POST, go back to PRE */
     newargs.TRACY_IP_REG -= TRACY_SYSCALL_OPSIZE;
 
+#   if defined(__arm64__) || defined(__aarch64__)
+    iov.iov_base = (void*) &newargs;
+    iov.iov_len  = sizeof(newargs);
+
+    ptrace(PTRACE_SETREGSET, child->pid, NT_PRSTATUS, &iov);
+#   else
     PTRACE_CHECK(PTRACE_SETREGS, child->pid, 0, &newargs, -1);
+#   endif
 
     PTRACE_CHECK(PTRACE_SYSCALL, child->pid, NULL, 0, -1);
 
@@ -213,11 +260,26 @@ int tracy_inject_syscall_post_start(struct tracy_child *child, long syscall_numb
 int tracy_inject_syscall_post_end(struct tracy_child *child, long *return_code) {
     struct TRACY_REGS_NAME newargs;
 
+#   if defined(__arm64__) || defined(__aarch64__)
+    struct iovec iov;
+    iov.iov_base = (void*) &newargs;
+    iov.iov_len  = sizeof(newargs);
+
+    ptrace(PTRACE_GETREGSET, child->pid, NT_PRSTATUS, &iov);
+#   else
     PTRACE_CHECK(PTRACE_GETREGS, child->pid, 0, &newargs, -1);
+#   endif
 
     *return_code = newargs.TRACY_RETURN_CODE;
 
+#   if defined(__arm64__) || defined(__aarch64__)
+    iov.iov_base = (void*) &child->inj.reg;
+    iov.iov_len  = sizeof(child->inj.reg);
+
+    ptrace(PTRACE_SETREGSET, child->pid, NT_PRSTATUS, &iov);
+#   else
     PTRACE_CHECK(PTRACE_SETREGS, child->pid, 0, &child->inj.reg, -1);
+#   endif
 
     return 0;
 }
@@ -242,7 +304,15 @@ int tracy_modify_syscall_args(struct tracy_child *child, long syscall_number,
         struct tracy_sc_args *a) {
     struct TRACY_REGS_NAME newargs;
 
+#   if defined(__arm64__) || defined(__aarch64__)
+    struct iovec iov;
+    iov.iov_base = (void*) &newargs;
+    iov.iov_len  = sizeof(newargs);
+
+    ptrace(PTRACE_GETREGSET, child->pid, NT_PRSTATUS, &iov);
+#   else
     PTRACE_CHECK(PTRACE_GETREGS, child->pid, 0, &newargs, -1);
+#   endif
 
     newargs.TRACY_SYSCALL_REGISTER = syscall_number;
     newargs.TRACY_SYSCALL_N = syscall_number; /* TODO: REMOVE SYSCALL_N ???*/
@@ -262,7 +332,14 @@ int tracy_modify_syscall_args(struct tracy_child *child, long syscall_number,
         set_reg(&newargs, 5, child->event.abi, a->a5);
     }
 
+#   if defined(__arm64__) || defined(__aarch64__)
+    iov.iov_base = (void*) &newargs;
+    iov.iov_len  = sizeof(newargs);
+
+    ptrace(PTRACE_SETREGSET, child->pid, NT_PRSTATUS, &iov);
+#   else
     PTRACE_CHECK(PTRACE_SETREGS, child->pid, 0, &newargs, -1);
+#   endif
 
     return 0;
 }
@@ -293,7 +370,15 @@ int tracy_modify_syscall_regs(struct tracy_child *child, long syscall_number,
         struct tracy_sc_args *a) {
     struct TRACY_REGS_NAME newargs;
 
+#   if defined(__arm64__) || defined(__aarch64__)
+    struct iovec iov;
+    iov.iov_base = (void*) &newargs;
+    iov.iov_len  = sizeof(newargs);
+
+    ptrace(PTRACE_GETREGSET, child->pid, NT_PRSTATUS, &iov);
+#   else
     PTRACE_CHECK(PTRACE_GETREGS, child->pid, 0, &newargs, -1);
+#   endif
 
     newargs.TRACY_SYSCALL_REGISTER = syscall_number;
     newargs.TRACY_SYSCALL_N = syscall_number;
@@ -313,7 +398,14 @@ int tracy_modify_syscall_regs(struct tracy_child *child, long syscall_number,
         newargs.TRACY_STACK_POINTER = a->sp;
     }
 
+#   if defined(__arm64__) || defined(__aarch64__)
+    iov.iov_base = (void*) &newargs;
+    iov.iov_len  = sizeof(newargs);
+
+    ptrace(PTRACE_SETREGSET, child->pid, NT_PRSTATUS, &iov);
+#   else
     PTRACE_CHECK(PTRACE_SETREGS, child->pid, 0, &newargs, -1);
+#   endif
 
     return 0;
 }
@@ -336,4 +428,3 @@ int tracy_deny_syscall(struct tracy_child *child) {
         child->denied_nr = nr;
     return r;
 }
-

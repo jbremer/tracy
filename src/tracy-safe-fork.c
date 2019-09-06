@@ -25,6 +25,8 @@
 #include <sys/mman.h>
 #include <sys/syscall.h>
 #include <sys/ptrace.h>
+#include <sys/uio.h>
+#include <linux/elf.h>
 #include <sched.h>
 
 #include "tracy.h"
@@ -78,6 +80,16 @@ int tracy_safe_fork(struct tracy_child *c, pid_t *new_child)
 
     child_pid = -1;
 
+#   if defined(__arm64__) || defined(__aarch64__)
+    struct iovec iov_ret;
+    iov_ret.iov_base = (void*) &args_ret;
+    iov_ret.iov_len  = sizeof(args_ret);
+
+    struct iovec iov;
+    iov.iov_base = (void*) &args;
+    iov.iov_len  = sizeof(args);
+#   endif
+
     tracy_debug_current(c);
 
 /*
@@ -122,20 +134,19 @@ int tracy_safe_fork(struct tracy_child *c, pid_t *new_child)
     /* Fetch the registers to store the original forking syscall and more importantly
      * the instruction pointer.
      */
+
+#   if defined(__arm64__) || defined(__aarch64__)
+    ptrace(PTRACE_GETREGSET, c->pid, NT_PRSTATUS, &iov);
+#   else
     PTRACE_CHECK(PTRACE_GETREGS, c->pid, 0, &args, -1);
+#   endif
 
     /* Deny so we can set the IP on the denied post and do our own fork in a
      * controlled environment */
     tracy_deny_syscall(c);
     c->denied_nr = 0;
     PTRACE_CHECK(PTRACE_SYSCALL, c->pid, 0, 0, -1);
-/*
-    puts("DENIED, in PRE");
-*/
     waitpid(c->pid, &status, __WALL);
-/*
-    puts("AFTER DENIED, entered POST");
-*/
 
     /* Okay, the child is now in POST syscall mode, and it has
      * just executed a bogus syscall (getpid) inserted by deny syscall.
@@ -182,7 +193,11 @@ int tracy_safe_fork(struct tracy_child *c, pid_t *new_child)
     printf(_b("Pointer data @ IP-4 0x%lx: 0x%lx")"\n", ip - 4,  ptrace(PTRACE_PEEKDATA, c->pid, ip - 4, NULL));
     */
 
+#   if defined(__arm64__) || defined(__aarch64__)
+    ptrace(PTRACE_SETREGSET, c->pid, NT_PRSTATUS, &iov);
+#   else
     PTRACE_CHECK(PTRACE_SETREGS, c->pid, 0, &args, -1);
+#   endif
 
 /*
     printf("The IP was changed from %p to %p\n", (void*)ip, (void*)mmap_ret);
@@ -197,7 +212,11 @@ int tracy_safe_fork(struct tracy_child *c, pid_t *new_child)
      * trying to execute a sched_yield, which we shall now make
      * into a fork syscall.
      */
+#   if defined(__arm64__) || defined(__aarch64__)
+    ptrace(PTRACE_GETREGSET, c->pid, NT_PRSTATUS, &iov_ret);
+#   else
     PTRACE_CHECK(PTRACE_GETREGS, c->pid, 0, &args_ret, -1);
+#   endif
 /*
     printf("The IP is now %p\n", (void*)args_ret.TRACY_IP_REG);
     printf("Modifying syscall back to fork\n");
@@ -221,7 +240,11 @@ int tracy_safe_fork(struct tracy_child *c, pid_t *new_child)
     PTRACE_CHECK(PTRACE_SET_SYSCALL, c->pid, 0, (void*)orig_syscall, -1);
     #endif
 
+#   if defined(__arm64__) || defined(__aarch64__)
+    ptrace(PTRACE_SETREGSET, c->pid, NT_PRSTATUS, &iov_ret);
+#   else
     PTRACE_CHECK(PTRACE_SETREGS, c->pid, 0, &args_ret, -1);
+#   endif
 
 /*
     puts("PRE, Entering POST");
@@ -321,7 +344,11 @@ int tracy_safe_fork(struct tracy_child *c, pid_t *new_child)
     if (!is_vforking || child_pid == -1) {
         waitpid(c->pid, &status, __WALL);
 
+#       if defined(__arm64__) || defined(__aarch64__)
+        ptrace(PTRACE_GETREGSET, c->pid, NT_PRSTATUS, &iov_ret);
+#       else
         PTRACE_CHECK(PTRACE_GETREGS, c->pid, 0, &args_ret, -1);
+#       endif
 
         /*
             printf("The IP is now %p\n", (void*)args_ret.TRACY_IP_REG);
@@ -346,7 +373,11 @@ int tracy_safe_fork(struct tracy_child *c, pid_t *new_child)
         args_ret.TRACY_IP_REG = ip;
         args_ret.TRACY_RETURN_CODE = child_pid;
 
+#       if defined(__arm64__) || defined(__aarch64__)
+        ptrace(PTRACE_SETREGSET, c->pid, NT_PRSTATUS, &iov_ret);
+#       else
         PTRACE_CHECK(PTRACE_SETREGS, c->pid, 0, &args_ret, -1);
+#       endif
         printf("Return code set to %d\n", child_pid);
 
         c->pre_syscall = 0;
@@ -376,15 +407,23 @@ int tracy_safe_fork(struct tracy_child *c, pid_t *new_child)
     args.TRACY_RETURN_CODE = 0;
 
     /* Retrieve stack pointer first.
-     * 
+     *
      * clone can modify the stack pointer, so the stack pointer
      * needs to be left untouched.
      */
+#   if defined(__arm64__) || defined(__aarch64__)
+    ptrace(PTRACE_GETREGSET, child_pid, NT_PRSTATUS, &iov_ret);
+#   else
     PTRACE_CHECK(PTRACE_GETREGS, child_pid, 0, &args_ret, -1);
+#   endif
     args.TRACY_STACK_POINTER = args_ret.TRACY_STACK_POINTER;
 
     /* Now update child registers */
+#   if defined(__arm64__) || defined(__aarch64__)
+    ptrace(PTRACE_SETREGSET, child_pid, NT_PRSTATUS, &iov);
+#   else
     PTRACE_CHECK(PTRACE_SETREGS, child_pid, 0, &args, -1);
+#   endif
 
     /* Set enhanced syscall tracing */
     PTRACE_CHECK(PTRACE_SETOPTIONS, child_pid, 0, PTRACE_O_TRACESYSGOOD, -1);

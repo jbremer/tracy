@@ -48,7 +48,7 @@
         #define ENTER_KERNEL \
             "mov %0, %%rax\n" \
             "syscall\n"
-    
+
     #elif defined(__i386__)
         /* x86 performs syscalls using the 0x80 interrupt,
          * the syscall number is stored within the EAX register
@@ -94,7 +94,26 @@
             "mov r7, %1\n" \
             "swi %0\n"
         /* OABI SWI_BASE */
+        #ifdef __ARM_EABI__
+        #define TRACY_SWI_BASE (0x0)
+        #else
         #define TRACY_SWI_BASE (0x900000)
+        #endif
+
+    #elif defined(__arm64__) || defined(__aarch64__)
+        /*
+         * ARM64
+         */
+        #define SET_SYSCALL "n"
+        #define INLINE_ARG0 "b"
+        #define INLINE_ARG1 "i"
+        #define LOAD_TRACER_PID \
+            "mov x0, x4\n" \
+            "mov x1, %1\n"
+        #define ENTER_KERNEL \
+            "mov x8, %0\n" \
+            "svc 0\n"
+
     #elif defined(__powerpc__)
         /* On powerpc the syscall number is stored in r0,
          * the arguments in r3-r9 we use r30 for the storing of the pid
@@ -227,4 +246,3 @@ void __trampy_container_func() {
 static int __trampy_size_sym() {
     return 42;
 }
-

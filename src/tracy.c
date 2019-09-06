@@ -42,9 +42,11 @@
 
 #include <sys/syscall.h>
 #include <sys/ptrace.h>
+#include <sys/uio.h>
 #include <sched.h>
 
 #include <sys/mman.h>
+#include <linux/elf.h>
 
 #include "ll.h"
 #include "tracy.h"
@@ -61,6 +63,9 @@
 #endif
 #ifdef __arm__
 #include "arch/arm/syscalls.h"
+#endif
+#if defined(__arm64__) || defined(__aarch64__)
+#include "arch/arm64/syscalls.h"
 #endif
 #ifdef __powerpc__
 #include "arch/ppc/syscalls.h"
@@ -693,7 +698,15 @@ int tracy_debug_current(struct tracy_child *child) {
     struct TRACY_REGS_NAME a;
     long abi;
 
+#   if defined(__arm64__) || defined(__aarch64__)
+    struct iovec iov;
+    iov.iov_base = (void*) &a;
+    iov.iov_len  = sizeof(a);
+    ptrace(PTRACE_GETREGSET, child->pid, NT_PRSTATUS, &iov);
+
+#   else
     PTRACE_CHECK(PTRACE_GETREGS, child->pid, 0, &a, -1);
+#   endif
 
     abi = child->event.abi;
 
@@ -837,4 +850,3 @@ int tracy_main(struct tracy *tracy) {
 
     return 0;
 }
-
