@@ -26,6 +26,8 @@
 
 #include <sys/syscall.h>
 #include <sys/ptrace.h>
+#include <sys/uio.h>
+#include <linux/elf.h>
 
 #include <string.h>
 
@@ -92,6 +94,8 @@ static int tracy_internal_syscall(struct tracy_event *s) {
     switch(s->syscall_num) {
 #pragma message "SYS_{fork,vfork,clone} cannot be used directly; not abi safe"
         /* TODO, FIXME XXX: SYS_fork is not always valid, depends on the ABI */
+#if !defined(__arm64__) && !defined(__aarch64__)
+        /* fork and vfork are not defined in ARM64, only clone is */
         case SYS_fork:
             printf("Internal Syscall %s\n", get_syscall_name_abi(s->syscall_num, s->abi));
             if (tracy_safe_fork(s->child, &child)) {
@@ -107,14 +111,10 @@ static int tracy_internal_syscall(struct tracy_event *s) {
             printf("Added and resuming child\n");
             tracy_continue(&new_child->event, 1);
 
-#if 0
-            printf("Continue parent\n");
-            tracy_continue(s, 1);
-#endif
-
             printf("Done!\n");
             return 0;
             break;
+#endif
 
         case SYS_clone:
             printf("Internal Syscall %s\n", get_syscall_name_abi(s->syscall_num, s->abi));
@@ -150,6 +150,8 @@ static int tracy_internal_syscall(struct tracy_event *s) {
             return 0;
             break;
 
+#if !defined(__arm64__) && !defined(__aarch64__)
+        /* fork and vfork are not defined in ARM64, only clone is */
         case SYS_vfork:
             printf("Internal Syscall %s\n", get_syscall_name_abi(s->syscall_num, s->abi));
             if (tracy_safe_fork(s->child, &child)) {
@@ -173,6 +175,7 @@ static int tracy_internal_syscall(struct tracy_event *s) {
             printf("Done!\n");
             return 0;
             break;
+#endif
 
         default:
             break;
@@ -386,7 +389,15 @@ struct tracy_event *tracy_wait_event(struct tracy *t, pid_t c_pid) {
      */
     if (signal_id == (SIGTRAP | 0x80)) {
         /* Make functions to retrieve this */
+#       if defined(__arm64__) || defined(__aarch64__)
+        struct iovec iov;
+        iov.iov_base = (void*) &regs;
+        iov.iov_len  = sizeof(regs);
+
+        ptrace(PTRACE_GETREGSET, pid, NT_PRSTATUS, &iov);
+#       else
         PTRACE_CHECK(PTRACE_GETREGS, pid, NULL, &regs, NULL);
+#       endif
 
         s->args.sp = regs.TRACY_STACK_POINTER;
 
@@ -583,4 +594,3 @@ int tracy_continue(struct tracy_event *s, int sigoverride) {
 
     return 0;
 }
-
