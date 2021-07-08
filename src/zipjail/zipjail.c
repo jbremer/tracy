@@ -1,18 +1,19 @@
 /*
     This file is part of Tracy.
 
-    Tracy is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+        DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
+                    Version 2, December 2004
 
-    Tracy is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+ Copyright (C) 2004 Sam Hocevar <sam@hocevar.net>
 
-    You should have received a copy of the GNU General Public License
-    along with Tracy.  If not, see <http://www.gnu.org/licenses/>.
+ Everyone is permitted to copy and distribute verbatim or modified
+ copies of this license document, and changing it is allowed as long
+ as the name is changed.
+
+            DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
+   TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
+
+  0. You just DO WHAT THE FUCK YOU WANT TO.
 */
 
 #include <stdio.h>
@@ -50,7 +51,7 @@ static const char *g_syscall_allowed[] = {
     "exit_group", "fchmod", "utime", "getdents", "chmod", "munmap", "time",
     "rt_sigaction", "brk", "fcntl", "access", "getcwd", "chdir", "select",
     "newfstatat", "fstat64", "_llseek", "gettimeofday", "stat64",
-    "getdents64", "getpid", NULL,
+    "getdents64", "getpid", "fchown", NULL,
 };
 
 static const char *g_openat_allowed[] = {
@@ -605,9 +606,9 @@ int main(int argc, char *argv[])
 {
     if(argc < 4) {
         fprintf(stderr,
-            "zipjail 0.5.2 - safe unpacking of potentially unsafe archives.\n"
+            "zipjail 0.5.3 - safe unpacking of potentially unsafe archives.\n"
             "Copyright (C) 2016-2018, Jurriaan Bremer <jbr@hatching.io>.\n"
-            "Copyright (C) 2018-2019, Hatching B.V.\n"
+            "Copyright (C) 2018-2021, Hatching B.V.\n"
             "Based on Tracy by Merlijn Wajer and Bas Weelinck.\n"
             "    (https://github.com/MerlijnWajer/tracy)\n"
             "\n"
